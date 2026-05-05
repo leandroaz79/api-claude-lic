@@ -1,12 +1,14 @@
 const express = require('express');
 const config = require('./config/env');
 const loggerMiddleware = require('./middleware/logger');
+const { limiter } = require('./middleware/rateLimiter');
 const chatRoutes = require('./routes/chat');
 
 const app = express();
 
 app.use(express.json());
 app.use(loggerMiddleware);
+app.use(limiter);
 
 app.get('/', (req, res) => {
   res.send('API Gateway Online 🚀');

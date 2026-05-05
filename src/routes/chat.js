@@ -1,10 +1,11 @@
 const express = require('express');
 const { forwardToRouter } = require('../services/proxyService');
 const authMiddleware = require('../middleware/auth');
+const { strictLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
 
-router.post('/chat/completions', authMiddleware, async (req, res) => {
+router.post('/chat/completions', strictLimiter, authMiddleware, async (req, res) => {
   try {
     const result = await forwardToRouter(req.body, {
       'x-license-id': req.license.id

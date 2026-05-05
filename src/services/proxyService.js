@@ -1,11 +1,15 @@
 const fetch = require('node-fetch');
 const config = require('../config/env');
 
-async function forwardToRouter(body, headers) {
+/**
+ * Proxy transparente para 9Router
+ * NÃO modifica o payload, apenas encaminha
+ */
+async function forwardToRouter(endpoint, body, headers) {
   try {
-    const url = `${config.routerUrl}/chat/completions`;
+    const url = `${config.routerUrl}${endpoint}`;
     console.log('[PROXY] Forwarding to:', url);
-    console.log('[PROXY] Body:', JSON.stringify(body));
+    console.log('[PROXY] Model:', body.model || 'not specified');
 
     const response = await fetch(url, {
       method: 'POST',

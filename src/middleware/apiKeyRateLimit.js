@@ -90,8 +90,11 @@ function apiKeyRateLimit(req, res, next) {
 
   const now = Date.now();
 
-  // Limpa timestamps antigos desta API Key antes de verificar
-  let timestamps = cleanupApiKeyTimestamps(apiKey, now);
+  // Obtém timestamps existentes (sem limpar ainda)
+  let timestamps = requestStore.get(apiKey) || [];
+
+  // Remove apenas timestamps FORA da janela de 60 segundos
+  timestamps = timestamps.filter(t => (now - t) < WINDOW_MS);
 
   console.log(`[RATE-LIMIT] API Key: ${apiKey} | Current requests: ${timestamps.length}/${MAX_REQUESTS}`);
 

@@ -96,18 +96,20 @@ function apiKeyRateLimit(req, res, next) {
   // Verifica se excedeu o limite
   if (timestamps.length >= MAX_REQUESTS) {
     const oldestTimestamp = timestamps[0];
-    const resetInSeconds = Math.ceil((oldestTimestamp + WINDOW_MS - now) / 1000);
+    const resetInSeconds = Math.max(1, Math.ceil((oldestTimestamp + WINDOW_MS - now) / 1000));
 
-    // Headers informativos
+    // Headers informativos - Remaining sempre 0 quando excedido
     res.setHeader('RateLimit-Limit', MAX_REQUESTS);
     res.setHeader('RateLimit-Remaining', 0);
     res.setHeader('RateLimit-Reset', resetInSeconds);
+    res.setHeader('Retry-After', resetInSeconds);
 
     // Log detalhado
     console.log(`[RATE-LIMIT] API Key exceeded: ${apiKey} | License ID: ${licenseId} | Reset in: ${resetInSeconds}s`);
 
     return res.status(429).json({
-      error: 'Rate limit exceeded. Try again in a few seconds.'
+      error: 'Rate limit exceeded. Try again in a few seconds.',
+      retryAfter: resetInSeconds
     });
   }
 
@@ -117,10 +119,10 @@ function apiKeyRateLimit(req, res, next) {
 
   // Calcula tempo de reset (quando a requisição mais antiga expira)
   const oldestTimestamp = timestamps[0];
-  const resetInSeconds = Math.ceil((oldestTimestamp + WINDOW_MS - now) / 1000);
-  const remaining = MAX_REQUESTS - timestamps.length;
+  const resetInSeconds = Math.max(1, Math.ceil((oldestTimestamp + WINDOW_MS - now) / 1000));
+  const remaining = Math.max(0, MAX_REQUESTS - timestamps.length);
 
-  // Headers informativos
+  // Headers informativos - Remaining nunca negativo
   res.setHeader('RateLimit-Limit', MAX_REQUESTS);
   res.setHeader('RateLimit-Remaining', remaining);
   res.setHeader('RateLimit-Reset', resetInSeconds);

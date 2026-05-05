@@ -3,59 +3,80 @@
  *
  * Controla requisições por API Key individualmente
  * - 60 requisições por minuto por API Key
- * - Armazenamento em memória com limpeza automática
- * - Previne memory leak limitando o tamanho do Map
+ * - Armazenamento em memória com limpeza inteligente
+ * - Remove apenas entradas inativas (sem requisições há 5+ minutos)
  */
 
 const requestStore = new Map();
 
 // Configuração
-const WINDOW_MS = 60 * 1000; // 60 segundos
+const WINDOW_MS = 60 * 1000; // 60 segundos (janela de rate limit)
 const MAX_REQUESTS = 60; // 60 requisições por janela
-const MAX_KEYS_IN_MEMORY = 10000; // Limite de API Keys no Map (proteção contra memory leak)
+const INACTIVE_THRESHOLD = 5 * 60 * 1000; // 5 minutos sem atividade = inativo
 
 /**
  * Limpa timestamps antigos de uma API Key específica
- * Remove a entrada do Map se não houver timestamps válidos
+ * Remove apenas timestamps fora da janela de 60 segundos
+ * Retorna os timestamps válidos
  */
-function cleanupApiKey(apiKey, now) {
+function cleanupApiKeyTimestamps(apiKey, now) {
   const timestamps = requestStore.get(apiKey);
-  if (!timestamps) return;
+  if (!timestamps) return [];
 
+  // Filtra apenas timestamps dentro da janela de rate limit
   const validTimestamps = timestamps.filter(t => now - t < WINDOW_MS);
 
   if (validTimestamps.length === 0) {
     requestStore.delete(apiKey);
-  } else {
-    requestStore.set(apiKey, validTimestamps);
+    return [];
+  }
+
+  requestStore.set(apiKey, validTimestamps);
+  return validTimestamps;
+}
+
+/**
+ * Remove API Keys inativas do Map
+ * Uma API Key é considerada inativa se não recebe requisições há mais de 5 minutos
+ * NUNCA limpa o Map inteiro - apenas entradas inativas
+ */
+function cleanupInactiveKeys() {
+  const now = Date.now();
+  let removedCount = 0;
+
+  for (const [apiKey, timestamps] of requestStore.entries()) {
+    if (timestamps.length === 0) {
+      requestStore.delete(apiKey);
+      removedCount++;
+      continue;
+    }
+
+    // Pega o timestamp mais recente
+    const lastActivity = Math.max(...timestamps);
+
+    // Se não há atividade há mais de 5 minutos, remove
+    if (now - lastActivity > INACTIVE_THRESHOLD) {
+      requestStore.delete(apiKey);
+      removedCount++;
+    }
+  }
+
+  if (removedCount > 0) {
+    console.log(`[RATE-LIMIT] Cleanup: removed ${removedCount} inactive API Keys. Active: ${requestStore.size}`);
   }
 }
 
 /**
- * Limpa todas as entradas antigas do Map periodicamente
- * Previne crescimento infinito da memória
+ * Limpeza periódica de API Keys inativas
+ * Executa a cada 2 minutos
  */
 setInterval(() => {
-  const now = Date.now();
-
-  // Se o Map está muito grande, limpa tudo (proteção contra memory leak)
-  if (requestStore.size > MAX_KEYS_IN_MEMORY) {
-    console.log(`[RATE-LIMIT] Map size exceeded ${MAX_KEYS_IN_MEMORY}, clearing all entries`);
-    requestStore.clear();
-    return;
-  }
-
-  // Limpeza normal
-  for (const [apiKey] of requestStore.entries()) {
-    cleanupApiKey(apiKey, now);
-  }
-
-  console.log(`[RATE-LIMIT] Cleanup completed. Active API Keys: ${requestStore.size}`);
-}, 2 * 60 * 1000); // A cada 2 minutos
+  cleanupInactiveKeys();
+}, 2 * 60 * 1000);
 
 /**
  * Middleware de Rate Limiting por API Key
- * Deve ser executado APÓS o middleware de autenticação
+ * DEVE ser executado APÓS o middleware de autenticação
  */
 function apiKeyRateLimit(req, res, next) {
   // Obtém a API Key do objeto license (já validada pelo auth middleware)
@@ -70,10 +91,7 @@ function apiKeyRateLimit(req, res, next) {
   const now = Date.now();
 
   // Limpa timestamps antigos desta API Key antes de verificar
-  cleanupApiKey(apiKey, now);
-
-  // Obtém ou cria array de timestamps para esta API Key
-  let timestamps = requestStore.get(apiKey) || [];
+  let timestamps = cleanupApiKeyTimestamps(apiKey, now);
 
   // Verifica se excedeu o limite
   if (timestamps.length >= MAX_REQUESTS) {

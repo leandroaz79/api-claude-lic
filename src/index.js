@@ -1,21 +1,22 @@
 const express = require('express');
 const config = require('./config/env');
 const loggerMiddleware = require('./middleware/logger');
-const { limiter } = require('./middleware/rateLimiter');
 const chatRoutes = require('./routes/chat');
 
 const app = express();
 
 /**
- * Ordem correta dos middlewares:
+ * Ordem correta dos middlewares globais:
  * 1. JSON parser
  * 2. Logger (registra todas as requisições)
- * 3. Rate limit global (proteção anti-DDoS, muito alto)
- * 4. Rotas (autenticação e rate limit por API Key são aplicados nas rotas específicas)
+ *
+ * Rate limiting é aplicado nas rotas específicas:
+ * - Auth middleware (valida API Key)
+ * - Rate limit por API Key (60 req/min) - PRINCIPAL
+ * - Rate limit global (1000 req/15min) - apenas anti-DDoS
  */
 app.use(express.json());
 app.use(loggerMiddleware);
-app.use(limiter); // Rate limit global leve (1000 req/15min por IP)
 
 app.get('/', (req, res) => {
   res.send('API Gateway Online 🚀');

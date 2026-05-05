@@ -2,7 +2,6 @@ const express = require('express');
 const { forwardToRouter } = require('../services/proxyService');
 const authMiddleware = require('../middleware/auth');
 const apiKeyRateLimit = require('../middleware/apiKeyRateLimit');
-const { limiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
 
@@ -11,11 +10,13 @@ const router = express.Router();
  *
  * Ordem CORRETA dos middlewares:
  * 1. authMiddleware - Valida API Key no Supabase
- * 2. apiKeyRateLimit - Rate limit por API Key (60 req/min) - PRINCIPAL
- * 3. limiter - Rate limit global (1000 req/15min) - Fallback anti-DDoS
- * 4. Handler - Encaminha para 9Router
+ * 2. apiKeyRateLimit - Rate limit por API Key (60 req/min) - ÚNICO CONTROLE
+ * 3. Handler - Encaminha para 9Router
+ *
+ * Nota: Rate limit global foi removido desta rota para não sobrescrever
+ * os headers do rate limit por API Key
  */
-router.post('/chat/completions', authMiddleware, apiKeyRateLimit, limiter, async (req, res) => {
+router.post('/chat/completions', authMiddleware, apiKeyRateLimit, async (req, res) => {
   try {
     const result = await forwardToRouter(req.body, {
       'x-license-id': req.license.id

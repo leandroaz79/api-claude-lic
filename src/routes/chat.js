@@ -5,6 +5,14 @@ const apiKeyRateLimit = require('../middleware/apiKeyRateLimit');
 
 const router = express.Router();
 
+/**
+ * POST /v1/chat/completions
+ *
+ * Ordem dos middlewares:
+ * 1. authMiddleware - Valida API Key no Supabase
+ * 2. apiKeyRateLimit - Rate limit por API Key (60 req/min)
+ * 3. Handler - Encaminha para 9Router
+ */
 router.post('/chat/completions', authMiddleware, apiKeyRateLimit, async (req, res) => {
   try {
     const result = await forwardToRouter(req.body, {

@@ -20,12 +20,9 @@ function proxyHandler(endpoint) {
       // Define status antes de iniciar streaming
       res.status(result.status);
 
-      // Copia headers, exceto content-length (conflita com streaming)
+      // Copia headers, exceto content-length (conflita com streaming chunked)
       result.response.headers.forEach((value, key) => {
-        const lowerKey = key.toLowerCase();
-        if (lowerKey !== 'content-encoding' &&
-            lowerKey !== 'transfer-encoding' &&
-            lowerKey !== 'content-length') {
+        if (key.toLowerCase() !== 'content-length') {
           res.setHeader(key, value);
         }
       });

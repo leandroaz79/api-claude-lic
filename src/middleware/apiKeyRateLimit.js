@@ -93,6 +93,8 @@ function apiKeyRateLimit(req, res, next) {
   // Limpa timestamps antigos desta API Key antes de verificar
   let timestamps = cleanupApiKeyTimestamps(apiKey, now);
 
+  console.log(`[RATE-LIMIT] API Key: ${apiKey} | Current requests: ${timestamps.length}/${MAX_REQUESTS}`);
+
   // Verifica se excedeu o limite
   if (timestamps.length >= MAX_REQUESTS) {
     const oldestTimestamp = timestamps[0];

@@ -7,7 +7,7 @@ const app = express();
 
 /**
  * Ordem correta dos middlewares globais:
- * 1. JSON parser
+ * 1. JSON parser (com limite de 10MB para suportar payloads grandes do Claude CLI)
  * 2. Logger (registra todas as requisições)
  *
  * Rate limiting é aplicado nas rotas específicas:
@@ -15,7 +15,8 @@ const app = express();
  * - Rate limit por API Key (60 req/min) - PRINCIPAL
  * - Rate limit global (1000 req/15min) - apenas anti-DDoS
  */
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(loggerMiddleware);
 
 app.get('/', (req, res) => {
@@ -29,6 +30,14 @@ app.get('/health', (req, res) => {
 });
 
 app.use((err, req, res, next) => {
+  // Tratamento específico para payload muito grande
+  if (err.type === 'entity.too.large') {
+    console.error('[ERROR] Payload too large:', err.length);
+    return res.status(413).json({
+      error: 'Request payload too large'
+    });
+  }
+
   console.error('[ERROR]', err);
   res.status(500).json({ error: 'Internal server error' });
 });

@@ -8,6 +8,7 @@ const router = express.Router();
 /**
  * Proxy handler genérico
  * Encaminha requisições de forma transparente sem modificar o payload
+ * Suporta streaming com tratamento robusto de erros
  */
 function proxyHandler(endpoint) {
   return async (req, res) => {
@@ -16,18 +17,42 @@ function proxyHandler(endpoint) {
         'x-license-id': req.license.id
       });
 
+      // Define status antes de iniciar streaming
       res.status(result.status);
 
+      // Copia headers, exceto content-length (conflita com streaming)
       result.response.headers.forEach((value, key) => {
-        if (key.toLowerCase() !== 'content-encoding' && key.toLowerCase() !== 'transfer-encoding') {
+        const lowerKey = key.toLowerCase();
+        if (lowerKey !== 'content-encoding' &&
+            lowerKey !== 'transfer-encoding' &&
+            lowerKey !== 'content-length') {
           res.setHeader(key, value);
         }
       });
 
+      // Inicia streaming
       result.response.body.pipe(res);
+
+      // Garante encerramento correto do stream
+      result.response.body.on('end', () => {
+        res.end();
+      });
+
+      // Tratamento de erro no stream
+      result.response.body.on('error', (err) => {
+        console.error('[STREAM ERROR]', err);
+        if (!res.headersSent) {
+          res.status(500).end();
+        } else {
+          res.end();
+        }
+      });
+
     } catch (err) {
       console.error('[PROXY] Error:', err);
-      res.status(500).json({ error: 'Internal server error' });
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Internal server error' });
+      }
     }
   };
 }

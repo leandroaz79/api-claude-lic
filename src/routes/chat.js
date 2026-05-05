@@ -9,7 +9,7 @@ const router = express.Router();
  * Proxy handler genérico
  * Encaminha requisições de forma transparente sem modificar o payload
  */
-async function proxyHandler(endpoint) {
+function proxyHandler(endpoint) {
   return async (req, res) => {
     try {
       const result = await forwardToRouter(endpoint, req.body, {

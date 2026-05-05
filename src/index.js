@@ -8,6 +8,10 @@ const app = express();
 app.use(express.json());
 app.use(loggerMiddleware);
 
+app.get('/', (req, res) => {
+  res.send('API Gateway Online 🚀');
+});
+
 app.use('/v1', chatRoutes);
 
 app.get('/health', (req, res) => {
